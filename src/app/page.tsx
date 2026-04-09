@@ -1,66 +1,37 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
+
+import { useWallet } from '@/context/WalletContext';
+import Onboarding from '@/components/Onboarding';
+import Dashboard from '@/components/Dashboard';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Home() {
+  const { activeAccount, isLocked, isLoading } = useWallet();
+
+  if (isLoading) {
+    return (
+      <div className="flex-center" style={{ height: '100dvh', background: '#000' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="abrupt-wordmark" style={{ fontSize: '28px', marginBottom: '24px' }}>Abrupt</div>
+          <div style={{ width: '32px', height: '2px', background: 'rgba(56,189,248,0.3)', margin: '0 auto', borderRadius: '99px', overflow: 'hidden', position: 'relative' }}>
+            <div className="pulse" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, background: 'var(--blue)', borderRadius: '99px' }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <AnimatePresence mode="wait">
+      {isLocked ? (
+        <motion.div key="onboarding" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <Onboarding />
+        </motion.div>
+      ) : (
+        <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <Dashboard />
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
