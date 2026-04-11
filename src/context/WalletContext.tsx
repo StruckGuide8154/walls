@@ -188,7 +188,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
-    _setMnemonic(null);
     setAccounts([]);
     setVaultItems([]);
     setIsLocked(true);

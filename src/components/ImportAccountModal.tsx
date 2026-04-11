@@ -6,7 +6,7 @@ import { LucideX, LucideKey, LucideShieldAlert } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function ImportAccountModal({ onClose }: { onClose: () => void }) {
-  const { importAccountFromKey } = useWallet();
+  const { importKeyVault: importAccountFromKey } = useWallet();
   const [key, setKey] = useState('');
   const [network, setNetwork] = useState<'ETH' | 'SOL'>('ETH');
   const [password, setPassword] = useState('');
