@@ -63,7 +63,7 @@ export default function Onboarding() {
 
   return (
     <div style={{
-      height: '100dvh', height: '100vh', width: '100vw',
+      height: '100vh', width: '100vw',
       background: '#000',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       padding: '20px',
