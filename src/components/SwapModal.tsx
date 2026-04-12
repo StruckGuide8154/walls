@@ -305,6 +305,7 @@ export default function SwapModal({ onClose, initialInputMint = SOL_MINT, userTo
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   const canSwap = quote && txStatus === 'idle' && !isFetching && !quoteError && activeAccount?.solAddress;
+  const isBusy = txStatus === 'signing' || txStatus === 'sending';
 
   return (
     <div className="flex-center" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 400, padding: '16px' }}>
@@ -492,7 +493,7 @@ export default function SwapModal({ onClose, initialInputMint = SOL_MINT, userTo
             {/* Swap / Status Button */}
             <button
               onClick={txStatus === 'idle' || txStatus === 'error' ? executeSwap : undefined}
-              disabled={!canSwap || txStatus === 'signing' || txStatus === 'sending'}
+              disabled={!canSwap || isBusy}
               className="btn-primary"
               style={{ width: '100%', fontSize: 13, fontWeight: 900, padding: '14px 0', opacity: (!canSwap && txStatus === 'idle') ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
             >
