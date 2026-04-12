@@ -31,6 +31,7 @@ import SendModal from './SendModal';
 import SettingsModal from './SettingsModal';
 import AddVaultModal from './AddVaultModal';
 import History from './History';
+import SwapModal from './SwapModal';
 
 const NETWORKS = [
   { id: 'ETH',      name: 'Ethereum',   color: '#627EEA' },
@@ -43,7 +44,7 @@ const NETWORKS = [
   { id: 'SEPOLIA',  name: 'Sepolia',    color: '#A0A0A0' },
 ];
 
-type MobileTab = 'home' | 'networks' | 'history' | 'accounts';
+type MobileTab = 'home' | 'networks' | 'history' | 'accounts' | 'swap';
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 function useIsMobile() {
@@ -73,6 +74,7 @@ export default function Dashboard() {
   const [isRefreshing, setIsRefreshing]   = useState(false);
   const [showReceive, setShowReceive]     = useState(false);
   const [showSend, setShowSend]           = useState(false);
+  const [showSwap, setShowSwap]           = useState(false);
   const [showSettings, setShowSettings]   = useState(false);
   const [showAddVault, setShowAddVault]   = useState(false);
   const [copied, setCopied]               = useState<string | null>(null);
@@ -238,6 +240,14 @@ export default function Dashboard() {
     <>
       {showReceive && <ReceiveModal onClose={() => setShowReceive(false)} />}
       {showSend    && <SendModal onClose={() => setShowSend(false)} onRefresh={refreshBalances} />}
+      {showSwap    && (
+        <SwapModal
+          onClose={() => setShowSwap(false)}
+          initialInputMint={selectedNetwork === 'SOL' ? 'So11111111111111111111111111111111111111112' : undefined}
+          solBalanceRaw={parseFloat(balances['SOL'] || '0')}
+          userTokens={tokenBalances}
+        />
+      )}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showAddVault && <AddVaultModal onClose={() => setShowAddVault(false)} />}
 
@@ -445,6 +455,10 @@ export default function Dashboard() {
                   <div style={{ display: 'flex', gap: 12 }}>
                     <button className="desk-btn-primary" onClick={() => setShowSend(true)}>INITIATE TRANSFER</button>
                     <button className="desk-btn-secondary" onClick={() => setShowReceive(true)}>RECEIVE ASSETS</button>
+                    <button className="desk-btn-secondary" onClick={() => setShowSwap(true)}
+                      style={{ borderColor: 'rgba(20,241,149,0.3)', color: '#14F195' }}>
+                      <LucideArrowRightLeft size={12} style={{ display: 'inline', marginRight: 6 }} />SWAP
+                    </button>
                   </div>
                 </div>
               </div>
@@ -592,9 +606,12 @@ export default function Dashboard() {
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: 12, padding: '0 20px 20px' }}>
-                <button className="btn-primary" style={{ flex: 1 }} onClick={() => setShowSend(true)}><LucideSend size={16} /> Send</button>
-                <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowReceive(true)}><LucideQrCode size={16} /> Receive</button>
+              <div style={{ display: 'flex', gap: 10, padding: '0 20px 20px' }}>
+                <button className="btn-primary" style={{ flex: 1 }} onClick={() => setShowSend(true)}><LucideSend size={15} /> Send</button>
+                <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowReceive(true)}><LucideQrCode size={15} /> Receive</button>
+                <button className="btn-secondary" style={{ flex: 1, color: '#14F195', borderColor: 'rgba(20,241,149,0.25)', background: 'rgba(20,241,149,0.06)' }} onClick={() => setShowSwap(true)}>
+                  <LucideArrowRightLeft size={15} /> Swap
+                </button>
               </div>
 
               <div style={{ display: 'flex', gap: 8, padding: '0 20px 16px', fontSize: 10 }}>
@@ -701,9 +718,12 @@ export default function Dashboard() {
                       {formatUsd(nativeUsd(selectedNetwork))}
                     </div>
                   )}
-                  <div style={{ display: 'flex', gap: 10, marginTop: formatUsd(nativeUsd(selectedNetwork)) ? 0 : 20 }}>
-                    <button className="btn-primary" style={{ flex: 1, padding: 12 }} onClick={() => setShowSend(true)}><LucideSend size={14} /> Send</button>
-                    <button className="btn-secondary" style={{ flex: 1, padding: 12 }} onClick={() => setShowReceive(true)}><LucideQrCode size={14} /> Receive</button>
+                  <div style={{ display: 'flex', gap: 8, marginTop: formatUsd(nativeUsd(selectedNetwork)) ? 0 : 20 }}>
+                    <button className="btn-primary" style={{ flex: 1, padding: 12 }} onClick={() => setShowSend(true)}><LucideSend size={13} /> Send</button>
+                    <button className="btn-secondary" style={{ flex: 1, padding: 12 }} onClick={() => setShowReceive(true)}><LucideQrCode size={13} /> Receive</button>
+                    <button className="btn-secondary" style={{ flex: 1, padding: 12, color: '#14F195', borderColor: 'rgba(20,241,149,0.25)', background: 'rgba(20,241,149,0.06)' }} onClick={() => setShowSwap(true)}>
+                      <LucideArrowRightLeft size={13} /> Swap
+                    </button>
                   </div>
                 </div>
                 {/* Token list for selected chain */}
