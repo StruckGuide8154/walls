@@ -151,9 +151,14 @@ html, body {
   letter-spacing: 0.2px;
   transition: all 0.2s;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 8px;
+}
+
+.btn-primary:disabled {
+  opacity: 0.55;
 }
 
 .btn-primary:active:not(:disabled) {
