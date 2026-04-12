@@ -46,6 +46,28 @@ export const setCache = async (key: string, val: any) => {
   return db.put(STORE_NAME, val, key);
 };
 
+export const getNativePrices = async (): Promise<Record<string, number>> => {
+  try {
+    const res = await fetch(
+      'https://api.coingecko.com/api/v3/simple/price?ids=ethereum,solana,bitcoin,matic-network&vs_currencies=usd'
+    );
+    const data = await res.json();
+    const eth = data.ethereum?.usd || 0;
+    return {
+      ETH:      eth,
+      BASE:     eth,
+      ARBITRUM: eth,
+      SEPOLIA:  0,
+      HYPER:    0,
+      SOL:      data.solana?.usd || 0,
+      BTC:      data.bitcoin?.usd || 0,
+      POLYGON:  data['matic-network']?.usd || 0,
+    };
+  } catch {
+    return {};
+  }
+};
+
 export const getNetworkStats = async (network: string) => {
   try {
     const rpc = RPC_ENDPOINTS[network];
