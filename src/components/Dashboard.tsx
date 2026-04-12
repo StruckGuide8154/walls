@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { useWallet } from '@/context/WalletContext';
-import { getEvmBalance, getSolBalance, getBtcBalance, getCache, getNetworkStats } from '@/lib/api';
+import { getEvmBalance, getSolBalance, getBtcBalance, getCache, getNetworkStats, getNativePrices } from '@/lib/api';
+import { getSolTokens, getSolTokenPrices, getEvmTokenBalances, type TokenBalance } from '@/lib/tokens';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   LucideRefreshCcw,
@@ -67,6 +68,8 @@ export default function Dashboard() {
   const isMobile = useIsMobile();
 
   const [balances, setBalances]           = useState<Record<string, string>>({});
+  const [prices, setPrices]               = useState<Record<string, number>>({});
+  const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
   const [isRefreshing, setIsRefreshing]   = useState(false);
   const [showReceive, setShowReceive]     = useState(false);
   const [showSend, setShowSend]           = useState(false);
@@ -92,6 +95,49 @@ export default function Dashboard() {
     if (num < 0.0001) return num.toFixed(8);
     if (num < 1) return num.toFixed(6);
     return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+  };
+
+  const formatUsd = (val: number) => {
+    if (!val || val === 0) return null;
+    if (val < 0.01) return '<$0.01';
+    return '$' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const nativeUsd = (networkId: string) => {
+    const bal = parseFloat(balances[networkId] || '0');
+    const price = prices[networkId] || 0;
+    return bal * price;
+  };
+
+  const totalPortfolioUsd = () => {
+    let total = 0;
+    for (const net of NETWORKS) total += nativeUsd(net.id);
+    for (const t of tokenBalances) {
+      if (t.priceUsd) total += t.amount * t.priceUsd;
+    }
+    return total;
+  };
+
+  const fetchTokenBalances = async (network: string, account: typeof activeAccount) => {
+    if (!account) return;
+    try {
+      if (network === 'SOL' && account.solAddress) {
+        const tokens = await getSolTokens(account.solAddress);
+        const mints = tokens.map(t => t.mint!).filter(Boolean);
+        const tokenPrices = await getSolTokenPrices(mints);
+        setTokenBalances(tokens.map(t => ({
+          ...t,
+          priceUsd: t.mint ? (tokenPrices[t.mint] ?? undefined) : undefined,
+        })));
+      } else if (network !== 'BTC' && account.ethAddress) {
+        const tokens = await getEvmTokenBalances(account.ethAddress, network);
+        setTokenBalances(tokens);
+      } else {
+        setTokenBalances([]);
+      }
+    } catch {
+      setTokenBalances([]);
+    }
   };
 
   const refreshBalances = async (forceAll = false) => {
@@ -134,6 +180,7 @@ export default function Dashboard() {
     }
     setBalances(nb);
     setIsRefreshing(false);
+    fetchTokenBalances(selectedNetwork, activeAccount);
   };
 
   useEffect(() => {
@@ -144,7 +191,12 @@ export default function Dashboard() {
       }
     };
     autoSelect();
+    getNativePrices().then(setPrices);
   }, [activeAccountIndex]);
+
+  useEffect(() => {
+    fetchTokenBalances(selectedNetwork, activeAccount);
+  }, [selectedNetwork, activeAccountIndex]);
 
   const handleDeriveMore = async () => {
     if (!passphrasePrompt) return;
@@ -336,6 +388,11 @@ export default function Dashboard() {
                       {formatBal(balances[net.id])}
                     </span>
                     {net.id}
+                    {nativeUsd(net.id) > 0 && (
+                      <span style={{ fontSize: 7, color: '#14F195', fontWeight: 700 }}>
+                        {formatUsd(nativeUsd(net.id))}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -360,9 +417,21 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 40 }}>
-                    <h1 style={{ fontSize: 64, fontWeight: 900, letterSpacing: -2 }}>{currentBal}</h1>
-                    <span style={{ fontSize: 24, fontWeight: 800, color: '#333' }}>{currentToken}</span>
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+                      <h1 style={{ fontSize: 64, fontWeight: 900, letterSpacing: -2 }}>{currentBal}</h1>
+                      <span style={{ fontSize: 24, fontWeight: 800, color: '#333' }}>{currentToken}</span>
+                    </div>
+                    {formatUsd(nativeUsd(selectedNetwork)) && (
+                      <div style={{ fontSize: 18, fontWeight: 700, color: '#38BDF8', marginBottom: 24 }}>
+                        {formatUsd(nativeUsd(selectedNetwork))}
+                        {totalPortfolioUsd() > nativeUsd(selectedNetwork) && (
+                          <span style={{ fontSize: 11, color: '#444', marginLeft: 12, fontWeight: 600 }}>
+                            {formatUsd(totalPortfolioUsd())} total portfolio
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {activeAddr && (
@@ -383,29 +452,55 @@ export default function Dashboard() {
               {/* Portfolio inventory */}
               <div className="desk-glass" style={{ flex: 1, padding: 24, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                  <span style={{ fontSize: 10, fontWeight: 900, color: '#333' }}>PORTFOLIO INVENTORY</span>
-                  <span style={{ fontSize: 9, color: '#0052FF', fontWeight: 'bold' }}>ALCHEMY SYNC: ACTIVE</span>
+                  <span style={{ fontSize: 10, fontWeight: 900, color: '#333' }}>TOKEN BALANCES</span>
+                  {formatUsd(totalPortfolioUsd()) && (
+                    <span style={{ fontSize: 11, color: '#38BDF8', fontWeight: 800 }}>{formatUsd(totalPortfolioUsd())} total</span>
+                  )}
                 </div>
                 <div className="desk-inner-scroll">
-                  <div className="desk-asset-row" style={{ borderRadius: 8, background: 'rgba(255,255,255,0.01)' }}>
+                  {/* Native token row */}
+                  <div className="desk-asset-row">
                     <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>
-                        {selectedNetwork[0]}
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: `${currentNet.color}18`, border: `1px solid ${currentNet.color}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, color: currentNet.color }}>
+                        {currentToken[0]}
                       </div>
                       <div>
-                        <p style={{ fontSize: 12, fontWeight: 'bold' }}>Native {selectedNetwork}</p>
-                        <p style={{ fontSize: 9, color: '#333' }}>{selectedNetwork} Network Token</p>
+                        <p style={{ fontSize: 12, fontWeight: 700 }}>{currentToken}</p>
+                        <p style={{ fontSize: 9, color: '#333' }}>{currentNet.name} native</p>
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <p style={{ fontSize: 12, fontWeight: 'bold' }}>{formatBal(balances[selectedNetwork])}</p>
-                      <p style={{ fontSize: 9, color: '#14F195' }}>──</p>
+                      <p style={{ fontSize: 12, fontWeight: 700 }}>{formatBal(balances[selectedNetwork])}</p>
+                      <p style={{ fontSize: 10, color: '#14F195', fontWeight: 600 }}>{formatUsd(nativeUsd(selectedNetwork)) || '—'}</p>
                     </div>
                   </div>
-                  <div style={{ padding: 24, textAlign: 'center', opacity: 0.15 }}>
-                    <LucideShieldAlert size={20} style={{ margin: '0 auto 8px' }} />
-                    <p style={{ fontSize: 9, fontWeight: 'bold' }}>NO SECONDARY TOKENS DETECTED</p>
-                  </div>
+                  {/* Secondary tokens */}
+                  {tokenBalances.length > 0 ? tokenBalances.map((tok, i) => (
+                    <div key={tok.address || tok.mint || i} className="desk-asset-row">
+                      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900, color: '#888' }}>
+                          {tok.symbol.slice(0, 2)}
+                        </div>
+                        <div>
+                          <p style={{ fontSize: 12, fontWeight: 700 }}>{tok.symbol}</p>
+                          <p style={{ fontSize: 9, color: '#333', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tok.name}</p>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <p style={{ fontSize: 12, fontWeight: 700 }}>
+                          {tok.amount < 0.0001 ? tok.amount.toFixed(8) : tok.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                        </p>
+                        <p style={{ fontSize: 10, color: '#14F195', fontWeight: 600 }}>
+                          {tok.priceUsd ? (formatUsd(tok.amount * tok.priceUsd) || '—') : '—'}
+                        </p>
+                      </div>
+                    </div>
+                  )) : (
+                    <div style={{ padding: '20px 0', textAlign: 'center', opacity: 0.15 }}>
+                      <LucideShieldAlert size={20} style={{ margin: '0 auto 8px' }} />
+                      <p style={{ fontSize: 9, fontWeight: 'bold' }}>NO TOKENS FOUND</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -478,6 +573,16 @@ export default function Dashboard() {
                 </div>
                 <div className="balance-amount gradient-text">{currentBal}</div>
                 <div className="balance-token">{currentToken}</div>
+                {formatUsd(nativeUsd(selectedNetwork)) && (
+                  <div style={{ marginTop: 6, fontSize: 20, fontWeight: 700, color: '#38BDF8' }}>
+                    {formatUsd(nativeUsd(selectedNetwork))}
+                  </div>
+                )}
+                {totalPortfolioUsd() > nativeUsd(selectedNetwork) + 0.01 && (
+                  <div style={{ marginTop: 2, fontSize: 11, color: '#555', fontWeight: 600 }}>
+                    {formatUsd(totalPortfolioUsd())} total portfolio
+                  </div>
+                )}
                 {activeAddr && (
                   <button onClick={() => copy(activeAddr, 'm-addr')}
                     style={{ marginTop: 16, background: 'rgba(255,255,255,0.04)', border: '1px solid var(--glass-stroke)', borderRadius: 99, padding: '6px 14px', display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--text-dim)' }}>
@@ -504,6 +609,36 @@ export default function Dashboard() {
                   </div>
                 ))}
               </div>
+
+              {/* Token balances strip */}
+              {tokenBalances.length > 0 && (
+                <div style={{ padding: '0 20px 12px' }}>
+                  <div className="section-label" style={{ marginBottom: 8 }}>Tokens</div>
+                  <div className="glass-card" style={{ padding: '4px 0' }}>
+                    {tokenBalances.slice(0, 5).map((tok, i) => (
+                      <div key={tok.address || tok.mint || i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: i < Math.min(tokenBalances.length, 5) - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, color: '#888' }}>
+                            {tok.symbol.slice(0, 2)}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 700 }}>{tok.symbol}</div>
+                            <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{tok.name}</div>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 12, fontWeight: 700 }}>
+                            {tok.amount < 0.0001 ? tok.amount.toFixed(6) : tok.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                          </div>
+                          <div style={{ fontSize: 10, color: '#14F195', fontWeight: 600 }}>
+                            {tok.priceUsd ? (formatUsd(tok.amount * tok.priceUsd) || '—') : '—'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div style={{ flex: 1, overflow: 'hidden', padding: '0 20px', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -539,6 +674,11 @@ export default function Dashboard() {
                       onClick={() => setSelectedNetwork(net.id)}>
                       <span style={{ fontSize: 9, fontWeight: 800, color: selectedNetwork === net.id ? net.color : '#333' }}>{formatBal(balances[net.id])}</span>
                       {net.id}
+                      {nativeUsd(net.id) > 0 && (
+                        <span style={{ fontSize: 7, color: '#14F195', fontWeight: 700 }}>
+                          {formatUsd(nativeUsd(net.id))}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -552,15 +692,47 @@ export default function Dashboard() {
                       <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{selectedNetwork} Network</div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                     <span style={{ fontSize: 36, fontWeight: 900, letterSpacing: -1 }}>{currentBal}</span>
                     <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-dim)' }}>{currentToken}</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 10 }}>
+                  {formatUsd(nativeUsd(selectedNetwork)) && (
+                    <div style={{ fontSize: 16, fontWeight: 700, color: '#38BDF8', marginBottom: 16, marginTop: 2 }}>
+                      {formatUsd(nativeUsd(selectedNetwork))}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 10, marginTop: formatUsd(nativeUsd(selectedNetwork)) ? 0 : 20 }}>
                     <button className="btn-primary" style={{ flex: 1, padding: 12 }} onClick={() => setShowSend(true)}><LucideSend size={14} /> Send</button>
                     <button className="btn-secondary" style={{ flex: 1, padding: 12 }} onClick={() => setShowReceive(true)}><LucideQrCode size={14} /> Receive</button>
                   </div>
                 </div>
+                {/* Token list for selected chain */}
+                {tokenBalances.length > 0 && (
+                  <div className="glass-card" style={{ padding: '4px 0', marginBottom: 16 }}>
+                    <div style={{ padding: '10px 16px 6px', fontSize: 9, fontWeight: 900, color: 'var(--text-dim)', letterSpacing: 1 }}>TOKENS</div>
+                    {tokenBalances.map((tok, i) => (
+                      <div key={tok.address || tok.mint || i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: i < tokenBalances.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, color: '#888' }}>
+                            {tok.symbol.slice(0, 2)}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 700 }}>{tok.symbol}</div>
+                            <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{tok.name}</div>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 13, fontWeight: 700 }}>
+                            {tok.amount < 0.0001 ? tok.amount.toFixed(6) : tok.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                          </div>
+                          <div style={{ fontSize: 10, color: '#14F195', fontWeight: 600 }}>
+                            {tok.priceUsd ? (formatUsd(tok.amount * tok.priceUsd) || '—') : '—'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {activeAddr && (
                   <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--glass-stroke)', borderRadius: 12, padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
